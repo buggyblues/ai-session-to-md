@@ -236,6 +236,8 @@ function renderSessionList() {
     const btn = document.createElement("button");
     btn.className = "session-item";
     btn.type = "button";
+    btn.dataset.sessionId = session.id;
+    btn.dataset.agent = session.agentParam;
     if (
       session.id === state.activeSessionId &&
       session.agentParam === state.activeSessionAgent
@@ -273,6 +275,23 @@ function renderSessionList() {
   sessionCountEl.textContent = `${sessions.length} session${sessions.length !== 1 ? "s" : ""}`;
 }
 
+// Lightweight: only toggle active class on existing items, no DOM rebuild
+function updateActiveHighlight() {
+  sessionListEl.querySelectorAll(".session-item").forEach((el) => {
+    el.classList.remove("active");
+  });
+  if (!state.activeSessionId || !state.activeSessionAgent) return;
+  // Find the matching item by data attributes
+  sessionListEl.querySelectorAll(".session-item").forEach((el) => {
+    if (
+      el.dataset.sessionId === state.activeSessionId &&
+      el.dataset.agent === state.activeSessionAgent
+    ) {
+      el.classList.add("active");
+    }
+  });
+}
+
 function escapeHtml(str) {
   if (!str) return "";
   return str
@@ -293,13 +312,20 @@ async function loadSession(agent, id) {
   url.searchParams.set("id", id);
   history.pushState(null, "", url);
 
-  // Update sidebar active state
-  renderSessionList();
+  // Update sidebar active state (just toggle class, don't rebuild)
+  updateActiveHighlight();
 
-  // Show loading
+  // Show loading overlay instead of hiding current content (avoids layout shift)
   emptyStateEl.hidden = true;
-  sessionViewEl.hidden = true;
-  sessionLoadingEl.hidden = false;
+  const isFirstLoad = sessionViewEl.hidden;
+  if (isFirstLoad) {
+    sessionViewEl.hidden = true;
+    sessionLoadingEl.hidden = false;
+  } else {
+    // Already showing a session — keep it visible, add a subtle loading indicator
+    sessionViewEl.style.opacity = "0.5";
+    sessionViewEl.style.pointerEvents = "none";
+  }
 
   try {
     const res = await fetch(`/api/session/${agent}/${encodeURIComponent(id)}`);
@@ -310,9 +336,15 @@ async function loadSession(agent, id) {
 
     sessionLoadingEl.hidden = true;
     sessionViewEl.hidden = false;
+    sessionViewEl.style.opacity = "";
+    sessionViewEl.style.pointerEvents = "";
   } catch (err) {
     sessionLoadingEl.hidden = true;
-    emptyStateEl.hidden = false;
+    sessionViewEl.style.opacity = "";
+    sessionViewEl.style.pointerEvents = "";
+    if (isFirstLoad) {
+      emptyStateEl.hidden = false;
+    }
     showToast("Failed to load session", "error");
     console.error("Failed to load session:", err);
   }

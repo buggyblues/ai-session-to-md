@@ -361,6 +361,7 @@ body {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  transition: opacity 150ms ease;
 }
 
 /* Empty State */

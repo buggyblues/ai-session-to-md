@@ -16,6 +16,35 @@ const CLAUDE_TRANSCRIPTS_DIR = join(homedir(), ".claude", "transcripts");
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const AMP_THREADS_DIR = join(homedir(), ".local", "share", "amp", "threads");
 
+// ─── Session Cache ──────────────────────────────────────────
+// Cache session lists to avoid re-scanning 17k+ files on every request
+const sessionCache = {
+  claude: { data: null, timestamp: 0 },
+  amp: { data: null, timestamp: 0 },
+};
+const CACHE_TTL = 60_000; // 1 minute
+
+function getCachedSessions(agent) {
+  const entry = sessionCache[agent];
+  if (entry.data && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data;
+  }
+  return null;
+}
+
+function setCachedSessions(agent, data) {
+  sessionCache[agent] = { data, timestamp: Date.now() };
+}
+
+function invalidateCache(agent) {
+  if (agent) {
+    sessionCache[agent] = { data: null, timestamp: 0 };
+  } else {
+    sessionCache.claude = { data: null, timestamp: 0 };
+    sessionCache.amp = { data: null, timestamp: 0 };
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 
 function safeJsonParse(str) {
@@ -79,93 +108,116 @@ async function listClaudeSessions() {
   } catch {}
 
   // 2) projects dir — only top-level session files
+  //    FAST PATH: only stat files, don't read content for summary (17k+ files!)
+  //    Parallelized for speed
   try {
     const projectDirs = await readdir(CLAUDE_PROJECTS_DIR);
-    for (const projDir of projectDirs) {
-      const projPath = join(CLAUDE_PROJECTS_DIR, projDir);
-      try {
-        const projStat = await stat(projPath);
-        if (!projStat.isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      try {
-        const files = await readdir(projPath);
-        for (const f of files) {
-          if (!f.endsWith(".jsonl")) continue;
-          // Skip subagent files
-          if (f.startsWith("agent-")) continue;
-          const fp = join(projPath, f);
-          const st = await stat(fp);
-          if (st.size < 100) continue; // skip tiny/empty
-          const id = `${projDir}/${f.replace(".jsonl", "")}`;
-          let summary = "";
-          let title = "";
-          let timestamp = st.mtime.toISOString();
-          try {
-            const content = await readFile(fp, "utf-8");
-            const lines = content.split("\n").filter((l) => l.trim());
-
-            // summary type is usually at the END of the file
-            for (const line of lines.slice(-3)) {
-              const data = safeJsonParse(line);
-              if (data?.type === "summary" && data.summary) {
-                title = data.summary;
-                break;
-              }
-            }
-
-            // Find first user message for summary
-            for (const line of lines.slice(0, 10)) {
-              const data = safeJsonParse(line);
-              if (!data) continue;
-              if (data.type === "user") {
-                const msg = data.message;
-                if (msg && typeof msg.content === "string") {
-                  summary = msg.content;
-                  break;
-                }
-                if (typeof data.content === "string") {
-                  summary = data.content;
-                  break;
-                }
-              }
-            }
-
-            // Find first timestamp
-            for (const line of lines.slice(0, 3)) {
-              const data = safeJsonParse(line);
-              if (data?.timestamp) {
-                timestamp = formatTimestamp(data.timestamp);
-                break;
-              }
-            }
-          } catch {}
-
-          // Derive project name
-          const projectName = projDir
-            .replace(/^-/, "")
-            .replace(/-/g, "/")
-            .split("/")
-            .pop();
-
-          sessions.push({
-            id,
-            source: "claude-projects",
-            path: fp,
-            title: truncate(title, 80),
-            summary: truncate(summary),
-            projectName,
-            timestamp,
-            size: st.size,
-          });
+    const dirResults = await Promise.all(
+      projectDirs.map(async (projDir) => {
+        const projPath = join(CLAUDE_PROJECTS_DIR, projDir);
+        try {
+          const projStat = await stat(projPath);
+          if (!projStat.isDirectory()) return [];
+        } catch {
+          return [];
         }
-      } catch {}
+        try {
+          const files = await readdir(projPath);
+          const jsonlFiles = files.filter(f => f.endsWith(".jsonl") && !f.startsWith("agent-"));
+          const fileResults = await Promise.all(
+            jsonlFiles.map(async (f) => {
+              try {
+                const fp = join(projPath, f);
+                const st = await stat(fp);
+                if (st.size < 100) return null;
+                const id = `${projDir}/${f.replace(".jsonl", "")}`;
+                const projectName = projDir
+                  .replace(/^-/, "")
+                  .replace(/-/g, "/")
+                  .split("/")
+                  .pop();
+                return {
+                  id,
+                  source: "claude-projects",
+                  path: fp,
+                  title: "",
+                  summary: "",
+                  projectName,
+                  timestamp: st.mtime.toISOString(),
+                  size: st.size,
+                  _needsEnrich: true,
+                };
+              } catch {
+                return null;
+              }
+            })
+          );
+          return fileResults.filter(Boolean);
+        } catch {
+          return [];
+        }
+      })
+    );
+    for (const dirSessions of dirResults) {
+      sessions.push(...dirSessions);
     }
   } catch {}
 
   sessions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  // Only enrich the top N sessions that will actually be displayed
+  const TOP_N = 200;
+  const toEnrich = sessions.slice(0, TOP_N).filter(s => s._needsEnrich);
+  await Promise.all(toEnrich.map(s => enrichClaudeSession(s)));
+
   return sessions;
+}
+
+// Lazily read file to extract title/summary/timestamp for a Claude project session
+async function enrichClaudeSession(session) {
+  try {
+    const content = await readFile(session.path, "utf-8");
+    const lines = content.split("\n").filter((l) => l.trim());
+
+    // summary type is usually at the END of the file
+    for (const line of lines.slice(-3)) {
+      const data = safeJsonParse(line);
+      if (data?.type === "summary" && data.summary) {
+        session.title = truncate(data.summary, 80);
+        break;
+      }
+    }
+
+    // Find first user message for summary
+    for (const line of lines.slice(0, 10)) {
+      const data = safeJsonParse(line);
+      if (!data) continue;
+      if (data.type === "user") {
+        const msg = data.message;
+        if (msg && typeof msg.content === "string") {
+          session.summary = truncate(msg.content);
+          break;
+        }
+        if (typeof data.content === "string") {
+          session.summary = truncate(data.content);
+          break;
+        }
+      }
+    }
+
+    // Find first timestamp
+    for (const line of lines.slice(0, 3)) {
+      const data = safeJsonParse(line);
+      if (data?.timestamp) {
+        session.timestamp = formatTimestamp(data.timestamp);
+        break;
+      }
+    }
+
+    session._needsEnrich = false;
+  } catch {
+    session._needsEnrich = false;
+  }
 }
 
 function parseClaudeTranscriptLine(data) {
@@ -685,13 +737,20 @@ function formatToolCall(tc) {
 app.use(express.static(join(__dirname, "public")));
 app.use(express.json());
 
-// List all sessions
+// List all sessions (with caching)
 app.get("/api/sessions", async (req, res) => {
   try {
-    const [claude, amp] = await Promise.all([
-      listClaudeSessions(),
-      listAmpSessions(),
-    ]);
+    const forceRefresh = req.query.refresh === "true";
+    if (forceRefresh) invalidateCache();
+
+    let claude = getCachedSessions("claude");
+    let amp = getCachedSessions("amp");
+
+    const promises = [];
+    if (!claude) promises.push(listClaudeSessions().then(d => { claude = d; setCachedSessions("claude", d); }));
+    if (!amp) promises.push(listAmpSessions().then(d => { amp = d; setCachedSessions("amp", d); }));
+    if (promises.length) await Promise.all(promises);
+
     res.json({
       claude: claude.slice(0, 200),
       amp: amp.slice(0, 200),
@@ -710,12 +769,21 @@ app.get("/api/session/:agent/:id(*)", async (req, res) => {
     let parsed;
 
     if (agent === "claude") {
-      const allSessions = await listClaudeSessions();
+      // Try cache first, only list if not cached
+      let allSessions = getCachedSessions("claude");
+      if (!allSessions) {
+        allSessions = await listClaudeSessions();
+        setCachedSessions("claude", allSessions);
+      }
       const found = allSessions.find((s) => s.id === id);
       if (!found) return res.status(404).json({ error: "Session not found" });
       parsed = await parseClaudeSession(found);
     } else if (agent === "amp") {
-      const allSessions = await listAmpSessions();
+      let allSessions = getCachedSessions("amp");
+      if (!allSessions) {
+        allSessions = await listAmpSessions();
+        setCachedSessions("amp", allSessions);
+      }
       const found = allSessions.find((s) => s.id === id);
       if (!found) return res.status(404).json({ error: "Session not found" });
       parsed = await parseAmpSession(found);
