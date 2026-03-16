@@ -1,0 +1,14 @@
+{
+  "name": "ai-session-to-md",
+  "version": "1.0.0",
+  "description": "Convert local coding agent sessions (Claude Code, Amp) to Markdown with a beautiful web viewer",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "marked": "^15.0.0"
+  }
+}
