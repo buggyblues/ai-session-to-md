@@ -7,7 +7,7 @@ import { fetchSessions, fetchSession, fetchSessionMarkdown } from './utils/api';
 
 export default function App() {
   // ─── State ───────────────────────────────────────────────
-  const [sessions, setSessions] = useState({ claude: [], amp: [] });
+  const [sessions, setSessions] = useState({ claude: [], 'claude-internal': [], amp: [], copilot: [], codebuddy: [] });
   const [activeAgent, setActiveAgent] = useState('all');
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [activeSessionAgent, setActiveSessionAgent] = useState(null);
@@ -213,9 +213,24 @@ function getFilteredSessions(sessions, activeAgent, searchQuery) {
       ...sessions.claude.map((s) => ({ ...s, agent: 'claude', agentParam: 'claude' }))
     );
   }
+  if (activeAgent === 'all' || activeAgent === 'claude-internal') {
+    list.push(
+      ...(sessions['claude-internal'] || []).map((s) => ({ ...s, agent: 'claude-internal', agentParam: 'claude-internal' }))
+    );
+  }
   if (activeAgent === 'all' || activeAgent === 'amp') {
     list.push(
       ...sessions.amp.map((s) => ({ ...s, agent: 'amp', agentParam: 'amp' }))
+    );
+  }
+  if (activeAgent === 'all' || activeAgent === 'copilot') {
+    list.push(
+      ...(sessions.copilot || []).map((s) => ({ ...s, agent: 'copilot', agentParam: 'copilot' }))
+    );
+  }
+  if (activeAgent === 'all' || activeAgent === 'codebuddy') {
+    list.push(
+      ...(sessions.codebuddy || []).map((s) => ({ ...s, agent: 'codebuddy', agentParam: 'codebuddy' }))
     );
   }
 

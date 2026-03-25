@@ -177,10 +177,31 @@ body {
   display: flex;
   gap: 4px;
   padding: 12px 16px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  scroll-behavior: smooth;
+}
+
+.agent-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.agent-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-tabs::-webkit-scrollbar-thumb {
+  background: var(--bg-hover);
+  border-radius: 2px;
+}
+
+.agent-tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-elevated);
 }
 
 .tab {
-  flex: 1;
+  flex: 0 0 auto;
   padding: 7px 12px;
   border: none;
   background: transparent;
@@ -293,6 +314,10 @@ body {
 
 .session-agent-dot.claude {
   background: #e97451;
+}
+
+.session-agent-dot.claude-internal {
+  background: #a78bfa;
 }
 
 .session-agent-dot.amp {

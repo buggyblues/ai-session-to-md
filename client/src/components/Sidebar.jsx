@@ -37,7 +37,10 @@ export default function Sidebar({
   const tabs = [
     { key: 'all', label: 'All' },
     { key: 'claude', label: 'Claude Code' },
+    { key: 'claude-internal', label: 'Claude Internal' },
     { key: 'amp', label: 'Amp' },
+    { key: 'copilot', label: 'Copilot CLI' },
+    { key: 'codebuddy', label: 'CodeBuddy' },
   ];
 
   return (

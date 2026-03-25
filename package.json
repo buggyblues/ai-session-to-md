@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "description": "Convert local coding agent sessions (Claude Code, Amp) to Markdown with a beautiful web viewer",
   "type": "module",
+  "bin": {
+    "ai-session-to-md": "./cli.js"
+  },
   "scripts": {
     "start": "node server.js",
     "dev:server": "node --watch server.js",
     "dev:client": "cd client && npm run dev",
     "dev": "npm run dev:server & npm run dev:client",
     "build": "cd client && npm run build",
+    "cli": "node cli.js",
     "postinstall": "cd client && npm install"
   },
   "dependencies": {
