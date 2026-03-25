@@ -12,8 +12,24 @@ export default function SessionView({ session, loading, onExportMd, onCopyMd }) 
     }
   }, [session?.id]);
 
-  const agentLabel = session.agent === 'claude-code' ? 'Claude Code' : 'Amp';
-  const agentClass = session.agent === 'claude-code' ? 'claude' : 'amp';
+  const getAgentLabel = (agent) => {
+    switch (agent) {
+      case 'claude-code':
+        return { label: 'Claude Code', class: 'claude' };
+      case 'claude-internal':
+        return { label: 'Claude Internal', class: 'claude-internal' };
+      case 'amp':
+        return { label: 'Amp', class: 'amp' };
+      case 'copilot':
+        return { label: 'GitHub Copilot CLI', class: 'copilot' };
+      case 'codebuddy':
+        return { label: 'CodeBuddy', class: 'codebuddy' };
+      default:
+        return { label: agent, class: agent };
+    }
+  };
+
+  const { label: agentLabel, class: agentClass } = getAgentLabel(session.agent);
   const firstModel = session.messages.find((m) => m.model)?.model || '';
 
   return (

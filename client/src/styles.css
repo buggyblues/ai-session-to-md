@@ -324,6 +324,14 @@ body {
   background: #38bdf8;
 }
 
+.session-agent-dot.copilot {
+  background: #22c55e;
+}
+
+.session-agent-dot.codebuddy {
+  background: #f59e0b;
+}
+
 .session-item-time {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -461,10 +469,28 @@ body {
   border: 1px solid rgba(233, 116, 81, 0.25);
 }
 
+.agent-badge.claude-internal {
+  background: rgba(167, 139, 250, 0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
 .agent-badge.amp {
   background: rgba(56, 189, 248, 0.12);
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.agent-badge.copilot {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.agent-badge.codebuddy {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .session-header time {
