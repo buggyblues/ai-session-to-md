@@ -1,8 +1,17 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import Message from './Message';
+import DisplaySettings from './DisplaySettings';
 import { formatFullDate } from '../utils/format';
 
-export default function SessionView({ session, loading, onExportMd, onCopyMd }) {
+export default function SessionView({
+  session,
+  loading,
+  onExportMd,
+  onCopyMd,
+  displaySettings,
+  onUpdateSetting,
+  onResetSettings,
+}) {
   const messagesRef = useRef(null);
 
   // Scroll to top when session changes
@@ -24,6 +33,10 @@ export default function SessionView({ session, loading, onExportMd, onCopyMd }) 
         return { label: 'GitHub Copilot CLI', class: 'copilot' };
       case 'codebuddy':
         return { label: 'CodeBuddy', class: 'codebuddy' };
+      case 'box':
+        return { label: 'Box', class: 'box' };
+      case 'codex':
+        return { label: 'Codex', class: 'codex' };
       default:
         return { label: agent, class: agent };
     }
@@ -31,6 +44,30 @@ export default function SessionView({ session, loading, onExportMd, onCopyMd }) 
 
   const { label: agentLabel, class: agentClass } = getAgentLabel(session.agent);
   const firstModel = session.messages.find((m) => m.model)?.model || '';
+
+  // Filter messages by role/type based on display settings.
+  // Note: per-message inner filtering (thinking, toolCalls, tool_use payload)
+  // is handled inside <Message />.
+  const settings = displaySettings || {};
+  const visibleMessages = useMemo(() => {
+    return session.messages.filter((m) => {
+      if (m.role === 'user') return settings.showUser !== false;
+      if (m.role === 'assistant') {
+        // assistant message survives if either text OR (tool calls allowed and present)
+        if (settings.showAssistant === false) {
+          // Even with assistant text hidden, keep the message if it carries
+          // visible tool calls so the user can still see them.
+          if (settings.showToolCalls !== false && m.toolCalls?.length) return true;
+          return false;
+        }
+        return true;
+      }
+      if (m.role === 'tool') return settings.showToolResults !== false;
+      return true;
+    });
+  }, [session.messages, settings.showUser, settings.showAssistant, settings.showToolCalls, settings.showToolResults]);
+
+
 
   return (
     <div
@@ -50,6 +87,13 @@ export default function SessionView({ session, loading, onExportMd, onCopyMd }) 
           {session.title || session.summary || session.id}
         </h2>
         <div className="session-actions">
+          {displaySettings && (
+            <DisplaySettings
+              settings={displaySettings}
+              onUpdate={onUpdateSetting}
+              onReset={onResetSettings}
+            />
+          )}
           <button
             className="btn btn-secondary"
             type="button"
@@ -84,8 +128,16 @@ export default function SessionView({ session, loading, onExportMd, onCopyMd }) 
 
       {/* Messages */}
       <div ref={messagesRef} className="messages" role="log" aria-label="Conversation messages">
-        {session.messages.map((msg, i) => (
-          <Message key={i} message={msg} />
+        {visibleMessages.length === 0 && (
+          <div className="messages-empty">
+            <p>All content types are hidden.</p>
+            <button type="button" className="btn btn-secondary" onClick={onResetSettings}>
+              Reset display settings
+            </button>
+          </div>
+        )}
+        {visibleMessages.map((msg, i) => (
+          <Message key={i} message={msg} settings={settings} />
         ))}
       </div>
     </div>

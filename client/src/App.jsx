@@ -3,11 +3,14 @@ import Sidebar from './components/Sidebar';
 import SessionView from './components/SessionView';
 import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
+import useDisplaySettings from './hooks/useDisplaySettings';
 import { fetchSessions, fetchSession, fetchSessionMarkdown } from './utils/api';
+
+const SESSION_REFRESH_INTERVAL_MS = 15_000;
 
 export default function App() {
   // ─── State ───────────────────────────────────────────────
-  const [sessions, setSessions] = useState({ claude: [], 'claude-internal': [], amp: [], copilot: [], codebuddy: [] });
+  const [sessions, setSessions] = useState({ claude: [], 'claude-internal': [], amp: [], copilot: [], codebuddy: [], box: [], codex: [] });
   const [activeAgent, setActiveAgent] = useState('all');
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [activeSessionAgent, setActiveSessionAgent] = useState(null);
@@ -18,6 +21,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
+  const { settings: displaySettings, updateSetting, resetSettings } = useDisplaySettings();
 
   // ─── Toast ───────────────────────────────────────────────
   const showToast = useCallback((message, type = 'success') => {
@@ -28,16 +32,29 @@ export default function App() {
 
   // ─── Load sessions ──────────────────────────────────────
   useEffect(() => {
-    (async () => {
+    let mounted = true;
+
+    const loadSessions = async (refresh = false) => {
       try {
-        const data = await fetchSessions();
-        setSessions(data);
+        const data = await fetchSessions(refresh);
+        if (mounted) setSessions(data);
       } catch (err) {
         console.error('Failed to load sessions:', err);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
-    })();
+    };
+
+    loadSessions();
+    const interval = window.setInterval(() => loadSessions(true), SESSION_REFRESH_INTERVAL_MS);
+    const onFocus = () => loadSessions(true);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
 
   // ─── URL routing ─────────────────────────────────────────
@@ -122,7 +139,11 @@ export default function App() {
   const handleExportMd = useCallback(async () => {
     if (!activeSessionAgent || !activeSessionId) return;
     try {
-      const { text, filename } = await fetchSessionMarkdown(activeSessionAgent, activeSessionId);
+      const { text, filename } = await fetchSessionMarkdown(
+        activeSessionAgent,
+        activeSessionId,
+        displaySettings
+      );
       const blob = new Blob([text], { type: 'text/markdown' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -133,18 +154,22 @@ export default function App() {
     } catch {
       showToast('Export failed', 'error');
     }
-  }, [activeSessionAgent, activeSessionId, showToast]);
+  }, [activeSessionAgent, activeSessionId, displaySettings, showToast]);
 
   const handleCopyMd = useCallback(async () => {
     if (!activeSessionAgent || !activeSessionId) return;
     try {
-      const { text } = await fetchSessionMarkdown(activeSessionAgent, activeSessionId);
+      const { text } = await fetchSessionMarkdown(
+        activeSessionAgent,
+        activeSessionId,
+        displaySettings
+      );
       await navigator.clipboard.writeText(text);
       showToast('Copied to clipboard');
     } catch {
       showToast('Copy failed', 'error');
     }
-  }, [activeSessionAgent, activeSessionId, showToast]);
+  }, [activeSessionAgent, activeSessionId, displaySettings, showToast]);
 
   // ─── Filtered sessions ──────────────────────────────────
   const filteredSessions = getFilteredSessions(sessions, activeAgent, searchQuery);
@@ -184,6 +209,9 @@ export default function App() {
             loading={sessionLoading}
             onExportMd={handleExportMd}
             onCopyMd={handleCopyMd}
+            displaySettings={displaySettings}
+            onUpdateSetting={updateSetting}
+            onResetSettings={resetSettings}
           />
         )}
       </main>
@@ -233,8 +261,18 @@ function getFilteredSessions(sessions, activeAgent, searchQuery) {
       ...(sessions.codebuddy || []).map((s) => ({ ...s, agent: 'codebuddy', agentParam: 'codebuddy' }))
     );
   }
+  if (activeAgent === 'all' || activeAgent === 'box') {
+    list.push(
+      ...(sessions.box || []).map((s) => ({ ...s, agent: 'box', agentParam: 'box' }))
+    );
+  }
+  if (activeAgent === 'all' || activeAgent === 'codex') {
+    list.push(
+      ...(sessions.codex || []).map((s) => ({ ...s, agent: 'codex', agentParam: 'codex' }))
+    );
+  }
 
-  list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  list.sort((a, b) => getSessionSortTime(b) - getSessionSortTime(a));
 
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
@@ -248,4 +286,10 @@ function getFilteredSessions(sessions, activeAgent, searchQuery) {
   }
 
   return list;
+}
+
+function getSessionSortTime(session) {
+  const value = session.sortTimestamp || session.timestamp;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
 }

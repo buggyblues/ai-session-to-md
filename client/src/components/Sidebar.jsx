@@ -41,6 +41,8 @@ export default function Sidebar({
     { key: 'amp', label: 'Amp' },
     { key: 'copilot', label: 'Copilot CLI' },
     { key: 'codebuddy', label: 'CodeBuddy' },
+    { key: 'box', label: 'Box' },
+    { key: 'codex', label: 'Codex' },
   ];
 
   return (

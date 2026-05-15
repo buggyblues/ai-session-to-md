@@ -1,7 +1,7 @@
 {
   "name": "ai-session-to-md",
   "version": "1.0.0",
-  "description": "Convert local coding agent sessions (Claude Code, Amp) to Markdown with a beautiful web viewer",
+  "description": "Convert local coding agent sessions (Claude Code, Codex, Amp) to Markdown with a beautiful web viewer",
   "type": "module",
   "bin": {
     "ai-session-to-md": "./cli.js"

@@ -332,6 +332,14 @@ body {
   background: #f59e0b;
 }
 
+.session-agent-dot.box {
+  background: #ec4899;
+}
+
+.session-agent-dot.codex {
+  background: #e5e7eb;
+}
+
 .session-item-time {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -491,6 +499,18 @@ body {
   background: rgba(245, 158, 11, 0.12);
   color: #f59e0b;
   border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.agent-badge.box {
+  background: rgba(236, 72, 153, 0.12);
+  color: #ec4899;
+  border: 1px solid rgba(236, 72, 153, 0.22);
+}
+
+.agent-badge.codex {
+  background: rgba(229, 231, 235, 0.1);
+  color: #e5e7eb;
+  border: 1px solid rgba(229, 231, 235, 0.18);
 }
 
 .session-header time {
@@ -976,4 +996,108 @@ body {
 /* Ensure hidden attribute always wins over display rules */
 [hidden] {
   display: none !important;
+}
+
+/* ─── Display Settings Panel ───────────────────────────────── */
+.display-settings {
+  position: relative;
+  display: inline-block;
+}
+
+.display-settings-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  margin-left: 4px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.display-settings-panel {
+  /* Positioned via inline style (fixed) and rendered through a portal so it
+     escapes the `.session-view` overflow:hidden clipping. */
+  z-index: 200;
+  width: 260px;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.display-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.display-settings-reset {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+}
+
+.display-settings-reset:hover {
+  color: var(--accent);
+}
+
+.display-settings-hint {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.display-settings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.display-settings-list li label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.display-settings-list li label:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.display-settings-list input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.messages-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 20px;
+  color: var(--text-tertiary);
+  text-align: center;
 }

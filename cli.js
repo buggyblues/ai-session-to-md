@@ -68,10 +68,13 @@ function parseAgents(str) {
     "claude-internal": "claude-internal",
     amp: "amp",
     copilot: "copilot",
+    codebuddy: "codebuddy",
+    box: "box",
+    codex: "codex",
   };
   return str.split(",").map(a => {
     const key = map[a.trim().toLowerCase()];
-    if (!key) die(`Unknown agent: ${a.trim()}. Valid: claude, claude-internal, amp, copilot`);
+    if (!key) die(`Unknown agent: ${a.trim()}. Valid: claude, claude-internal, amp, copilot, codebuddy, box, codex`);
     return key;
   });
 }
@@ -354,7 +357,8 @@ async function cmdStats(positional, flags) {
     const a = s.agent || "unknown";
     if (!byAgent[a]) byAgent[a] = { count: 0, oldest: null, newest: null, projects: new Set() };
     byAgent[a].count++;
-    const ts = s.timestamp ? new Date(s.timestamp) : null;
+    const rawTs = s.timestamp || s.sortTimestamp;
+    const ts = rawTs ? new Date(rawTs) : null;
     if (ts && !isNaN(ts.getTime())) {
       if (!byAgent[a].oldest || ts < byAgent[a].oldest) byAgent[a].oldest = ts;
       if (!byAgent[a].newest || ts > byAgent[a].newest) byAgent[a].newest = ts;
@@ -419,7 +423,7 @@ Commands:
   help     Show this help message
 
 Options:
-  --agent    Comma-separated list: claude, claude-internal, amp, copilot
+  --agent    Comma-separated list: claude, claude-internal, amp, copilot, codebuddy, box, codex
   --since    Filter by date: ISO date or relative (7d, 2w, 1m, 3h)
   --until    Filter by date: ISO date or relative
   --limit    Max results (default varies by command)
